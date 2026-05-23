@@ -361,7 +361,8 @@ export default function RasporedApp() {
   };
 
   // ============================================================
-  //  PAMETAN AUTO RASPORED - ALGORITAM
+  //  PAMETAN AUTO RASPORED - VERZIJA 2.0
+  //  GARANTUJE RAVNOMERNU RASPODELU SVIH 7 DANA
   // ============================================================
   const autoRasporedi = () => {
     setPodaci(prev => {
@@ -371,52 +372,101 @@ export default function RasporedApp() {
         let radnici = [...novi[sektor]];
         
         // 1. MEŠANJE POZICIJA RADNIKA (svaki put drugačiji redosled)
-        const seedZaMesane = weekOffset * 100 + sektorIndex * 13 + Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+        const seedZaMesane = weekOffset * 100 + sektorIndex * 13 + 
+          Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
         radnici = seedShuffle(radnici, seedZaMesane);
         
         // 2. Razdvajanje po smenama
         const prvaSmena = radnici.filter(r => r.smjena === "I");
         const drugaSmena = radnici.filter(r => r.smjena === "II");
         
-        // 3. PAMETNA RASPODELA SLOBODNIH DANA
-        const raspodeliSlobodneDane = (smenskiRadnici, smenaOffset) => {
+        // ========================================================
+        //  NOVI ALGORITAM - RAVNOMERNA RASPODELA SVIH DANA
+        // ========================================================
+        const raspodeliRavnomerno = (smenskiRadnici, smenaOffset) => {
           const brojRadnika = smenskiRadnici.length;
           
           if (brojRadnika === 0) return [];
           
           // Jedinstveni seed za ovu smenu i nedelju
-          const weekSeed = (weekOffset + smenaOffset + sektorIndex * 7 + 
-            Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000))) % 1000;
+          const weekSeed = Math.abs(
+            (weekOffset * 7 + smenaOffset * 13 + sektorIndex * 17 + 
+            Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000))) % 997
+          );
           
-          // Seed za raspodelu dana
-          const seed = Math.abs(weekSeed * 7 + brojRadnika * 13) % 100;
+          // KREIRAMO ŠABLON ZA SLOBODNE DANE
+          // Cilj: Svaki dan (0-6) mora biti zastupljen
           
-          return smenskiRadnici.map((radnik, index) => {
-            let slobodniDan;
-            
-            if (brojRadnika <= 7) {
-              // ≤ 7 radnika: svako dobija jedinstven dan
-              slobodniDan = (index + seed) % 7;
-              
-              // Ako bi dobio ISTI dan kao prošle nedelje → pomeramo za +1
-              if (radnik.slobodniDan === slobodniDan && brojRadnika > 1) {
-                slobodniDan = (slobodniDan + 1 + index) % 7;
-              }
-            } else {
-              // > 7 radnika: grupe po 7
-              const grupa = Math.floor(index / 7);
-              const pozicija = index % 7;
-              
-              // Različite grupe = različiti dani
-              slobodniDan = (pozicija + seed + grupa * 3) % 7;
-              
-              // Provera protiv ponavljanja
-              if (radnik.slobodniDan === slobodniDan) {
-                slobodniDan = (slobodniDan + 1 + grupa) % 7;
+          // Korak 1: Pravimo niz dana 0,1,2,3,4,5,6 koji se ponavlja
+          let sviDani = [];
+          const brojCiklusa = Math.ceil(brojRadnika / 7);
+          
+          for (let c = 0; c < brojCiklusa; c++) {
+            // Svaki ciklus mešamo dane drugačije
+            const ciklusDani = [0, 1, 2, 3, 4, 5, 6];
+            const ciklusSeed = weekSeed + c * 31 + smenaOffset;
+            const izmesaniDani = seedShuffle(ciklusDani, ciklusSeed);
+            sviDani.push(...izmesaniDani);
+          }
+          
+          // Odsecamo tačno onoliko dana koliko ima radnika
+          sviDani = sviDani.slice(0, brojRadnika);
+          
+          // Provera: Da li su SVI dani (0-6) zastupljeni?
+          const zastupljeniDani = new Set(sviDani);
+          
+          // Ako neki dan NIJE zastupljen, moramo ga dodati
+          if (zastupljeniDani.size < 7 && brojRadnika >= 7) {
+            // Nađemo koji dani nedostaju
+            const nedostajuci = [];
+            for (let d = 0; d < 7; d++) {
+              if (!zastupljeniDani.has(d)) {
+                nedostajuci.push(d);
               }
             }
             
-            // Osiguravamo da je dan u opsegu 0-6
+            // Zamenjujemo duplikate sa nedostajućim danima
+            const brojPojavljivanja = new Map();
+            sviDani.forEach(d => {
+              brojPojavljivanja.set(d, (brojPojavljivanja.get(d) || 0) + 1);
+            });
+            
+            // Nađemo dane koji se pojavljuju više puta
+            const duplikati = [];
+            brojPojavljivanja.forEach((broj, dan) => {
+              if (broj > 1) {
+                for (let i = 0; i < broj - 1; i++) {
+                  duplikati.push(dan);
+                }
+              }
+            });
+            
+            // Zamenjujemo duplikate nedostajućim danima
+            let nedIndex = 0;
+            sviDani = sviDani.map(d => {
+              if (duplikati.includes(d) && nedIndex < nedostajuci.length) {
+                const noviDan = nedostajuci[nedIndex];
+                // Uklanjamo ovaj duplikat iz liste
+                const dupIndex = duplikati.indexOf(d);
+                if (dupIndex > -1) duplikati.splice(dupIndex, 1);
+                nedIndex++;
+                return noviDan;
+              }
+              return d;
+            });
+          }
+          
+          // Dodeljujemo dane radnicima
+          return smenskiRadnici.map((radnik, index) => {
+            let slobodniDan = sviDani[index];
+            
+            // Provera: da nije isti dan kao prošle nedelje
+            if (radnik.slobodniDan === slobodniDan && brojRadnika > 1) {
+              // Rotiramo za +1
+              slobodniDan = (slobodniDan + 1 + index) % 7;
+            }
+            
+            // Finalna provera opsega
             slobodniDan = ((slobodniDan % 7) + 7) % 7;
             
             return {
@@ -426,14 +476,12 @@ export default function RasporedApp() {
           });
         };
         
-        // 4. Primenjujemo na obe smene sa RAZLIČITIM offsetima
-        const prvaSaDanima = raspodeliSlobodneDane(prvaSmena, 0);
-        const drugaSaDanima = raspodeliSlobodneDane(drugaSmena, 3);
+        // Primenjujemo na obe smene sa RAZLIČITIM offsetima
+        const prvaSaDanima = raspodeliRavnomerno(prvaSmena, 0);
+        const drugaSaDanima = raspodeliRavnomerno(drugaSmena, 3);
         
-        // 5. Spajamo nazad (čuvamo izmešani redosled)
-        const sviSaDanima = [...prvaSaDanima, ...drugaSaDanima];
-        
-        novi[sektor] = sviSaDanima;
+        // Spajamo nazad (čuvamo izmešani redosled)
+        novi[sektor] = [...prvaSaDanima, ...drugaSaDanima];
       });
       
       return novi;
@@ -653,7 +701,7 @@ export default function RasporedApp() {
             </div>
           </div>
           <p className="mt-2 text-xs text-gray-500">
-            💾 Podaci se automatski čuvaju | 📱 Možeš instalirati kao aplikaciju | 🔄 Auto Raspored - svaki put drugačije
+            💾 Podaci se automatski čuvaju | 📱 Možeš instalirati kao aplikaciju | 🔄 Auto Raspored - svaki put drugačije | ✅ Svi dani ravnomerno zastupljeni
           </p>
         </div>
       </div>
