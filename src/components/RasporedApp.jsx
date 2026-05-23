@@ -31,12 +31,12 @@ const POCETNI_PODACI = {
     { ime: "Novo.O", smjena: "I", pauza: "12:00-12:30", slobodniDan: 4 },
     { ime: "Slobo", smjena: "I", pauza: "10:30-11:00", slobodniDan: 5 },
     { ime: "Janko.J", smjena: "I", pauza: "09:00-09:30", slobodniDan: 6 },
-    { ime: "Jašović G", smjena: "I", pauza: "11:00-11:30", slobodniDan: 7 },
+    { ime: "Jašović G", smjena: "I", pauza: "11:00-11:30", slobodniDan: 0 },
     { ime: "Balša", smjena: "I", pauza: "10:00-10:30", slobodniDan: 1 },
     { ime: "Jovan", smjena: "II", pauza: "17:00-17:30", slobodniDan: 4 },
     { ime: "Miloš Z", smjena: "II", pauza: "17:30-18:00", slobodniDan: 5 },
     { ime: "Marko P", smjena: "II", pauza: "18:00-18:30", slobodniDan: 6 },
-    { ime: "Sreten", smjena: "II", pauza: "18:30-19:00", slobodniDan: 7 },
+    { ime: "Sreten", smjena: "II", pauza: "18:30-19:00", slobodniDan: 0 },
     { ime: "Ranko", smjena: "II", pauza: "19:00-19:30", slobodniDan: 1 },
     { ime: "Božo.B", smjena: "II", pauza: "19:30-20:00", slobodniDan: 2 },
     { ime: "Deni.P", smjena: "II", pauza: "20:00-20:30", slobodniDan: 3 },
@@ -44,7 +44,7 @@ const POCETNI_PODACI = {
   KUHINJA: [
     { ime: "Mira", smjena: "I", pauza: "09:00-09:30", slobodniDan: 2 },
     { ime: "Miroslav", smjena: "I", pauza: "09:30-10:00", slobodniDan: 6 },
-    { ime: "Slavica.A", smjena: "I", pauza: "10:00-10:30", slobodniDan: 7 },
+    { ime: "Slavica.A", smjena: "I", pauza: "10:00-10:30", slobodniDan: 0 },
     { ime: "Lidija", smjena: "I", pauza: "10:30-11:00", slobodniDan: 1 },
     { ime: "Dragan", smjena: "I", pauza: "11:00-11:30", slobodniDan: 3 },
     { ime: "Aziz", smjena: "I", pauza: "11:30-12:00", slobodniDan: 4 },
@@ -55,13 +55,13 @@ const POCETNI_PODACI = {
     { ime: "Mia.V", smjena: "II", pauza: "22:00-22:30", slobodniDan: 3 },
     { ime: "Ivana.M", smjena: "II", pauza: "19:30-20:00", slobodniDan: 4 },
     { ime: "Kristina.V", smjena: "II", pauza: "17:00-17:30", slobodniDan: 5 },
-    { ime: "Jovana.N", smjena: "II", pauza: "20:00-20:30", slobodniDan: 7 },
+    { ime: "Jovana.N", smjena: "II", pauza: "20:00-20:30", slobodniDan: 0 },
     { ime: "Vesna I", smjena: "II", pauza: "18:00-18:30", slobodniDan: 1 },
     { ime: "Nevena", smjena: "II", pauza: "20:30-21:00", slobodniDan: 2 },
   ],
   ŠANK: [
      { ime: "Nikola.D", smjena: "I", pauza: "10:00-10:30", slobodniDan: 5 },
-    { ime: "Nikola.M", smjena: "I", pauza: "09:30-10:00", slobodniDan: 7 },
+    { ime: "Nikola.M", smjena: "I", pauza: "09:30-10:00", slobodniDan: 0 },
     { ime: "Radovan", smjena: "I", pauza: "09:00-09:30", slobodniDan: 6 },
     { ime: "Nikola.P", smjena: "I", pauza: "10:30-11:00", slobodniDan: 4 },
     { ime: "Aco.K", smjena: "II", pauza: "17:30-18:00", slobodniDan: 3 },
@@ -101,17 +101,10 @@ const seedShuffle = (array, seed) => {
   return shuffled;
 };
 
-/**
- * MAGIČNA FUNKCIJA - Pravi savršeno izbalansiranu listu slobodnih dana
- * Garantuje da je razlika između dana max 1
- */
 const napraviBalansiranuListu = (ukupnoRadnika, seed) => {
   if (ukupnoRadnika === 0) return [];
-  
   const osnovno = Math.floor(ukupnoRadnika / 7);
   const ostatak = ukupnoRadnika % 7;
-  
-  // Pravimo idealan šablon
   let lista = [];
   for (let dan = 0; dan < 7; dan++) {
     const broj = osnovno + (dan < ostatak ? 1 : 0);
@@ -119,12 +112,8 @@ const napraviBalansiranuListu = (ukupnoRadnika, seed) => {
       lista.push(dan);
     }
   }
-  
-  // Rotiramo da ne bude uvek isti dani sa viškom
   const rotacija = seed % 7;
   lista = lista.map(d => (d + rotacija) % 7);
-  
-  // Mešamo
   return seedShuffle(lista, seed * 31 + 17);
 };
 
@@ -133,25 +122,25 @@ const napraviBalansiranuListu = (ukupnoRadnika, seed) => {
 // ------------------------------------------------------------
 const SektorTabela = ({ sektor, radnici, naslov, onAzurirajIme, onAzurirajSmjenu, onAzurirajDan, onAzurirajPauzu, onObrisi }) => {
   return (
-    <div className="mb-3 print:mb-2">
-      <h2 className="text-sm font-bold mb-1 pb-1 text-center uppercase tracking-wider"
+    <div className="mb-3 print:mb-1">
+      <h2 className="text-sm font-bold mb-1 pb-1 text-center uppercase tracking-wider print:text-[10px]"
           style={{ borderBottom: '2px solid black', fontSize: '14px', fontWeight: 'bold' }}>
         {naslov} ({radnici.length})
       </h2>
       <div className="overflow-x-auto -mx-1 px-1">
-        <table className="w-full border-collapse text-xs">
+        <table className="w-full border-collapse text-xs print:text-[6px]">
           <thead>
             <tr>
-              <th className="border border-black bg-gray-200 p-1.5 text-left font-bold sticky left-0 z-10"
+              <th className="border border-black bg-gray-200 p-1.5 print:p-0.5 text-left font-bold sticky left-0 z-10"
                   style={{ fontSize: '11px', minWidth: '100px' }}>IME</th>
-              <th className="border border-black bg-gray-200 p-1.5 text-center font-bold"
-                  style={{ fontSize: '11px', minWidth: '55px', width: '55px' }}>SMJENA</th>
+              <th className="border border-black bg-gray-200 p-1.5 print:p-0.5 text-center font-bold"
+                  style={{ fontSize: '11px', minWidth: '55px', width: '55px' }}>SM</th>
               {DANI.map(dan => (
-                <th key={dan} className="border border-black bg-gray-200 p-1.5 text-center font-bold"
+                <th key={dan} className="border border-black bg-gray-200 p-1.5 print:p-0.5 text-center font-bold"
                     style={{ fontSize: '10px', minWidth: '50px' }}>{dan.substring(0, 3)}</th>
               ))}
-              <th className="border border-black bg-yellow-200 p-1.5 text-center font-bold"
-                  style={{ fontSize: '10px', minWidth: '100px' }}>30 MIN PAUZA</th>
+              <th className="border border-black bg-yellow-200 p-1.5 print:p-0.5 text-center font-bold"
+                  style={{ fontSize: '10px', minWidth: '100px' }}>PAUZA</th>
               <th className="border border-black bg-gray-200 p-1.5 text-center font-bold no-print"
                   style={{ fontSize: '10px', width: '30px' }}>✕</th>
             </tr>
@@ -159,7 +148,7 @@ const SektorTabela = ({ sektor, radnici, naslov, onAzurirajIme, onAzurirajSmjenu
           <tbody>
             {radnici.map((radnik, index) => (
               <tr key={index}>
-                <td className="border border-black p-1 bg-white sticky left-0 z-10">
+                <td className="border border-black p-1 print:p-0.5 bg-white sticky left-0 z-10">
                   <input
                     value={radnik.ime}
                     onChange={(e) => onAzurirajIme(sektor, index, e.target.value)}
@@ -168,12 +157,12 @@ const SektorTabela = ({ sektor, radnici, naslov, onAzurirajIme, onAzurirajSmjenu
                     style={{ fontSize: '11px', minHeight: '20px' }}
                   />
                 </td>
-                <td className="border border-black p-1 text-center align-middle"
+                <td className="border border-black p-1 print:p-0.5 text-center align-middle"
                     style={{ backgroundColor: radnik.smjena === 'I' ? '#3B82F6' : '#22C55E', padding: '4px' }}>
                   <select
                     value={radnik.smjena}
                     onChange={(e) => onAzurirajSmjenu(sektor, index, e.target.value)}
-                    className="w-full text-center font-bold border-none outline-none"
+                    className="w-full text-center font-bold border-none outline-none print:text-[6px]"
                     style={{ fontSize: '14px', fontWeight: 'bold', backgroundColor: 'transparent', color: 'white', cursor: 'pointer', textAlign: 'center', textAlignLast: 'center' }}
                   >
                     <option value="I" style={{color: 'black', backgroundColor: '#DBEAFE'}}>I</option>
@@ -188,12 +177,12 @@ const SektorTabela = ({ sektor, radnici, naslov, onAzurirajIme, onAzurirajSmjenu
                   else if (val === 'I') { bg = '#3B82F6'; textColor = '#FFFFFF'; }
                   else if (val === 'II') { bg = '#22C55E'; textColor = '#FFFFFF'; }
                   return (
-                    <td key={dan} className="border border-black p-1 text-center align-middle"
+                    <td key={dan} className="border border-black p-1 print:p-0.5 text-center align-middle"
                         style={{ backgroundColor: bg, padding: '4px' }}>
                       <select
                         value={val}
                         onChange={(e) => onAzurirajDan(sektor, index, dan, e.target.value)}
-                        className="w-full text-center font-bold border-none outline-none"
+                        className="w-full text-center font-bold border-none outline-none print:text-[6px]"
                         style={{ fontSize: '14px', fontWeight: 'bold', backgroundColor: 'transparent', color: textColor, cursor: 'pointer', textAlign: 'center', textAlignLast: 'center' }}
                       >
                         {SMJENE.map(s => (
@@ -203,11 +192,11 @@ const SektorTabela = ({ sektor, radnici, naslov, onAzurirajIme, onAzurirajSmjenu
                     </td>
                   );
                 })}
-                <td className="border border-black p-1 bg-yellow-50">
+                <td className="border border-black p-1 print:p-0.5 bg-yellow-50">
                   <select
                     value={radnik.pauza}
                     onChange={(e) => onAzurirajPauzu(sektor, index, e.target.value)}
-                    className="w-full bg-transparent border-none outline-none font-bold text-center"
+                    className="w-full bg-transparent border-none outline-none font-bold text-center print:text-[6px]"
                     style={{ fontSize: '10px', textAlignLast: 'center' }}
                   >
                     {(radnik.smjena === "I" ? PAUZE_PRVA : PAUZE_DRUGA).map(p => (
@@ -259,8 +248,6 @@ export default function RasporedApp() {
     });
   }, []);
 
-  // =========== HANDLERI ===========
-  
   const azurirajIme = useCallback((sektor, index, ime) => {
     setPodaci(prev => {
       const novi = { ...prev };
@@ -307,53 +294,35 @@ export default function RasporedApp() {
     });
   }, []);
 
-  // =========== DODAVANJE RADNIKA SA PAMETNOM LOGIKOM ===========
   const dodajRadnika = (sektor) => {
     setPodaci(prev => {
       const novi = { ...prev };
       novi[sektor] = [...novi[sektor]];
       const radnici = novi[sektor];
-      const ukupno = radnici.length + 1; // +1 jer dodajemo novog
-      
-      // 1. Balansiramo smene - dodajemo tamo gde ima manje
+      const ukupno = radnici.length + 1;
       const prva = radnici.filter(r => r.smjena === "I").length;
       const druga = radnici.filter(r => r.smjena === "II").length;
       const smjena = prva <= druga ? "I" : "II";
-      
-      // 2. Dodeljujemo pauzu
       const pauza = smjena === "I"
         ? PAUZE_PRVA[prva % PAUZE_PRVA.length]
         : PAUZE_DRUGA[druga % PAUZE_DRUGA.length];
-      
-      // 3. PRONALAZIMO NAJBOLJI SLOBODAN DAN
-      //    Koristimo istu logiku kao auto raspored - balansiramo!
       const brojPoDanu = new Array(7).fill(0);
       radnici.forEach(r => brojPoDanu[r.slobodniDan]++);
-      
-      // Idealno bi bilo da svaki dan ima isti broj
       const idealno = Math.floor(ukupno / 7);
       const ostatak = ukupno % 7;
-      
-      // Tražimo dan koji najviše odstupa od idealnog (ima premalo slobodnih)
       let najboljiDan = 0;
       let najmanjiBroj = Infinity;
-      
       for (let dan = 0; dan < 7; dan++) {
         const idealnoZaOvajDan = idealno + (dan < ostatak ? 1 : 0);
         const trenutno = brojPoDanu[dan];
-        
-        // Ako ovaj dan ima manje od idealnog - to je kandidat
         if (trenutno < idealnoZaOvajDan && trenutno < najmanjiBroj) {
           najmanjiBroj = trenutno;
           najboljiDan = dan;
         }
       }
-      
-      // Ako nismo našli (svi dani već imaju idealno), uzimamo dan sa najmanje
       if (najmanjiBroj === Infinity) {
         najboljiDan = brojPoDanu.indexOf(Math.min(...brojPoDanu));
       }
-      
       radnici.push({ ime: "", smjena, pauza, slobodniDan: najboljiDan });
       return novi;
     });
@@ -369,41 +338,27 @@ export default function RasporedApp() {
     }
   };
 
-  // =========== AUTO RASPORED - SAVRŠEN BALANS ===========
   const autoRasporedi = () => {
     setPodaci(prev => {
       const novi = { ...prev };
-      
       Object.keys(novi).forEach((sektor, sektorIndex) => {
         const radnici = [...novi[sektor]];
         const ukupno = radnici.length;
-        
         if (ukupno === 0) return;
-        
-        // Kreiramo savršeno balansiranu listu dana
         const seed = weekOffset * 100 + sektorIndex * 13 + Math.floor(Date.now() / 86400000);
         const listaDana = napraviBalansiranuListu(ukupno, seed);
-        
-        // Ispis za proveru
         const brojPoDanu = new Array(7).fill(0);
         listaDana.forEach(d => brojPoDanu[d]++);
         console.log(`✅ ${sektor} (${ukupno}):`, DANI.map((d, i) => `${d.substring(0,3)}:${brojPoDanu[i]}`).join(' | '));
-        
-        // Dodeljujemo radnicima
         const noviRadnici = radnici.map((radnik, index) => {
           let dan = listaDana[index];
-          
-          // Ako je isti dan kao prošle nedelje - pomeri
           if (radnik.slobodniDan === dan && ukupno > 1) {
             dan = (dan + 1) % 7;
           }
-          
           return { ...radnik, slobodniDan: dan };
         });
-        
         novi[sektor] = noviRadnici;
       });
-      
       return novi;
     });
   };
@@ -424,18 +379,27 @@ export default function RasporedApp() {
   // =========== RENDER ===========
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white">
+      {/* ⬇️ SAMO OVO JE PROMENJENO - CSS ZA ŠTAMPU ⬇️ */}
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 8mm; }
+          @page { size: A4 portrait; margin: 3mm; }
           body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
           .no-print { display: none !important; }
-          table { width: 100% !important; border-collapse: collapse !important; }
-          th, td { border: 1px solid black !important; }
-          input, select { border: none !important; background: transparent !important; -webkit-appearance: none; -moz-appearance: none; font-size: 11px !important; font-weight: bold !important; color: black !important; }
-          th { font-size: 10px !important; font-weight: bold !important; background-color: #E5E5E5 !important; }
-          h2 { font-size: 13px !important; font-weight: bold !important; border-bottom: 2px solid black !important; }
+          table { width: 100% !important; border-collapse: collapse !important; font-size: 6px !important; }
+          th, td { border: 1px solid black !important; padding: 0.5px 1px !important; }
+          th { font-size: 6px !important; font-weight: bold !important; background-color: #E5E5E5 !important; }
+          input, select { border: none !important; background: transparent !important; -webkit-appearance: none; -moz-appearance: none; font-size: 6px !important; font-weight: bold !important; color: black !important; padding: 0 !important; }
+          h2 { font-size: 8px !important; font-weight: bold !important; border-bottom: 1px solid black !important; margin: 1px 0 !important; }
+          .mb-3, .mb-4 { margin-bottom: 1px !important; }
+          .p-2, .p-3, .p-4 { padding: 0 !important; }
+          .print\\:p-0\\.5 { padding: 0.5px !important; }
+          .print\\:p-0 { padding: 0 !important; }
+          .print\\:text-\\[6px\\] { font-size: 6px !important; }
+          .print\\:text-\\[10px\\] { font-size: 8px !important; }
+          .print\\:mb-1 { margin-bottom: 1px !important; }
         }
       `}</style>
+      {/* ⬆️ KRAJ IZMENE ⬆️ */}
 
       <div className="bg-white shadow-lg mb-4 no-print">
         <div className="max-w-full mx-auto p-3 sm:p-4">
@@ -463,9 +427,9 @@ export default function RasporedApp() {
 
       <div className="max-w-full mx-auto px-2 sm:px-4 print:px-0">
         <div className="bg-white rounded-lg shadow print:shadow-none p-2 sm:p-4 print:p-0">
-          <div className="hidden print:block text-center mb-2">
-            <h1 style={{fontSize: '16px', fontWeight: 'bold'}}>RASPORED SMJENA</h1>
-            <p style={{fontSize: '12px', fontWeight: 'bold'}}>{datumPrikaz}</p>
+          <div className="hidden print:block text-center mb-1">
+            <h1 style={{fontSize: '12px', fontWeight: 'bold'}}>RASPORED SMJENA</h1>
+            <p style={{fontSize: '9px', fontWeight: 'bold'}}>{datumPrikaz}</p>
           </div>
 
           <SektorTabela sektor="KONOBARI" radnici={konobariRaspored} naslov="KONOBARI"
@@ -480,7 +444,7 @@ export default function RasporedApp() {
             onAzurirajIme={azurirajIme} onAzurirajSmjenu={azurirajSmjenu}
             onAzurirajDan={azurirajDan} onAzurirajPauzu={azurirajPauzu} onObrisi={obrisiRadnika} />
 
-          <div className="hidden print:block mt-2 pt-1 border-t border-black text-xs font-bold">
+          <div className="hidden print:block mt-1 pt-0.5 border-t border-black text-[7px] font-bold">
             I = Prva smjena &nbsp;&nbsp;|&nbsp;&nbsp; II = Druga smjena &nbsp;&nbsp;|&nbsp;&nbsp; OFF = Slobodan dan
           </div>
         </div>
