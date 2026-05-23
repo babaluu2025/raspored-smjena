@@ -277,83 +277,100 @@ export default function RasporedApp() {
     }
   };
 
-  // ============================================================
-  //  NOVI AUTO RASPORED - PRAVILNA RASPODELA SVIH DANA
-  // ============================================================
   const autoRasporedi = () => {
-    setPodaci(prev => {
-      const novi = { ...prev };
+  setPodaci(prev => {
+    const novi = { ...prev };
+    
+    Object.keys(novi).forEach((sektor) => {
+      const radnici = [...novi[sektor]];
+      const ukupno = radnici.length;
       
-      Object.keys(novi).forEach((sektor, sektorIndex) => {
-        let radnici = [...novi[sektor]];
+      if (ukupno === 0) return;
+      
+      // ======================================================
+      //  KORAK 1: Pravimo šablon za CEO SEKTOR
+      //  Cilj: Svih 7 dana mora biti pokriveno što ravnomernije
+      // ======================================================
+      
+      // Računamo koliko radnika po danu (idealno)
+      const idealnoPoDanu = ukupno / 7;
+      
+      // Pravimo niz dana za sve radnike
+      let sviDani = [];
+      
+      // Prvo dodeljujemo svaki dan bar 1 (ako ima 7+ radnika)
+      if (ukupno >= 7) {
+        // Svaki dan dobija bar 1 slobodnog
+        for (let dan = 0; dan < 7; dan++) {
+          sviDani.push(dan);
+        }
         
-        const prvaSmena = radnici.filter(r => r.smjena === "I");
-        const drugaSmena = radnici.filter(r => r.smjena === "II");
+        // Ostatak ravnomerno raspoređujemo
+        const ostatak = ukupno - 7;
+        for (let i = 0; i < ostatak; i++) {
+          // Dodajemo dan koji trenutno ima najmanje slobodnih
+          const brojPoDanu = new Array(7).fill(0);
+          sviDani.forEach(d => brojPoDanu[d]++);
+          const minBroj = Math.min(...brojPoDanu);
+          const danSaNajmanje = brojPoDanu.indexOf(minBroj);
+          sviDani.push(danSaNajmanje);
+        }
+      } else {
+        // Manje od 7 radnika - biramo dane sa ravnomernim razmakom
+        // npr. 6 radnika = dani 0,1,2,3,4,5 (nedelja prazna)
+        //      5 radnika = dani 0,1,2,4,5 (sreda i subota prazne)
+        //      3 radnika = dani 0,2,4 (razmak 2)
         
-        const dodeliDane = (smenskiRadnici) => {
-          const brojRadnika = smenskiRadnici.length;
-          if (brojRadnika === 0) return [];
-          
-          let daniZaDodelu = [];
-          
-          // Pravimo šablon na osnovu broja radnika
-          if (brojRadnika === 1) {
-            daniZaDodelu = [Math.floor(Math.random() * 7)];
-          } else if (brojRadnika === 2) {
-            const d1 = Math.floor(Math.random() * 7);
-            const d2 = (d1 + 3) % 7;
-            daniZaDodelu = [d1, d2];
-          } else if (brojRadnika === 3) {
-            const start = Math.floor(Math.random() * 7);
-            daniZaDodelu = [start, (start + 2) % 7, (start + 4) % 7];
-          } else if (brojRadnika === 4) {
-            const start = Math.floor(Math.random() * 7);
-            daniZaDodelu = [start, (start + 2) % 7, (start + 4) % 7, (start + 5) % 7];
-          } else if (brojRadnika === 5) {
-            const start = Math.floor(Math.random() * 7);
-            daniZaDodelu = [start, (start + 1) % 7, (start + 2) % 7, (start + 4) % 7, (start + 5) % 7];
-          } else if (brojRadnika === 6) {
-            const preskoci = Math.floor(Math.random() * 7);
-            for (let i = 0; i < 7; i++) {
-              if (i !== preskoci) daniZaDodelu.push(i);
-            }
-          } else if (brojRadnika === 7) {
-            daniZaDodelu = [0, 1, 2, 3, 4, 5, 6];
-          } else {
-            // Više od 7 radnika
-            daniZaDodelu = [0, 1, 2, 3, 4, 5, 6];
-            const ostatak = brojRadnika - 7;
-            for (let i = 0; i < ostatak; i++) {
-              daniZaDodelu.push(i % 7);
-            }
-          }
-          
-          // Mešamo dane
-          daniZaDodelu = seedShuffle(daniZaDodelu, Date.now() % 1000);
-          
-          // Dodeljujemo radnicima
-          return smenskiRadnici.map((radnik, index) => {
-            let slobodniDan = daniZaDodelu[index];
-            
-            // Ako je isti dan kao prošle nedelje, pomeramo
-            if (radnik.slobodniDan === slobodniDan && brojRadnika > 1) {
-              slobodniDan = (slobodniDan + 1) % 7;
-            }
-            
-            return { ...radnik, slobodniDan };
-          });
-        };
+        const korak = 7 / ukupno;
+        for (let i = 0; i < ukupno; i++) {
+          const dan = Math.floor(i * korak);
+          sviDani.push(dan % 7);
+        }
         
-        const prvaSaDanima = dodeliDane(prvaSmena);
-        const drugaSaDanima = dodeliDane(drugaSmena);
-        
-        novi[sektor] = [...prvaSaDanima, ...drugaSaDanima];
+        // Rotiramo za random offset da ne bude uvek isto
+        const offset = Math.floor(Math.random() * 7);
+        sviDani = sviDani.map(d => (d + offset) % 7);
+      }
+      
+      // Mešamo dane
+      sviDani = seedShuffle(sviDani, Math.floor(Math.random() * 1000));
+      
+      // ======================================================
+      //  KORAK 2: Dodeljujemo dane radnicima
+      //  Prvo I smena, pa II smena
+      // ======================================================
+      
+      const prvaSmena = radnici.filter(r => r.smjena === "I");
+      const drugaSmena = radnici.filter(r => r.smjena === "II");
+      
+      let indexDana = 0;
+      
+      // Dodeljujemo I smeni
+      const prvaSaDanima = prvaSmena.map((radnik) => {
+        let dan = sviDani[indexDana];
+        if (radnik.slobodniDan === dan && ukupno > 1) {
+          dan = (dan + 1) % 7;
+        }
+        indexDana++;
+        return { ...radnik, slobodniDan: dan };
       });
       
-      return novi;
+      // Dodeljujemo II smeni
+      const drugaSaDanima = drugaSmena.map((radnik) => {
+        let dan = sviDani[indexDana];
+        if (radnik.slobodniDan === dan && ukupno > 1) {
+          dan = (dan + 1) % 7;
+        }
+        indexDana++;
+        return { ...radnik, slobodniDan: dan };
+      });
+      
+      novi[sektor] = [...prvaSaDanima, ...drugaSaDanima];
     });
-  };
-
+    
+    return novi;
+  });
+};
   const resetujPodatke = () => {
     if (window.confirm("Resetovati SVE podatke na početne?")) {
       localStorage.removeItem('rasporedPodaci');
