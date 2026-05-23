@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const DANI = [
   "Ponedeljak", "Utorak", "Srijeda", "Četvrtak", 
@@ -8,7 +8,6 @@ const DANI = [
 const SMJENE = ["I", "II", "OFF"];
 const SEKTORI = ["KONOBARI", "KUHINJA", "ŠANK"];
 
-// Pauze za prvu smenu (08:00-16:00)
 const PAUZE_PRVA = [
   "09:00-09:30", "09:30-10:00", "10:00-10:30", 
   "10:30-11:00", "11:00-11:30", "11:30-12:00",
@@ -16,7 +15,6 @@ const PAUZE_PRVA = [
   "13:30-14:00", "14:00-14:30", "14:30-15:00"
 ];
 
-// Pauze za drugu smenu (16:00-00:00)
 const PAUZE_DRUGA = [
   "17:00-17:30", "17:30-18:00", "18:00-18:30", 
   "18:30-19:00", "19:00-19:30", "19:30-20:00",
@@ -59,15 +57,43 @@ const POCETNI_PODACI = {
   ]
 };
 
+function getWeekDates(offset = 0) {
+  const now = new Date();
+  const day = now.getDay() || 7;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - day + 1 + (offset * 7));
+  
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  
+  const format = (d) => {
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}.${month}.${year}`;
+  };
+  
+  return `${format(monday)} - ${format(sunday)}`;
+}
+
 export default function RasporedApp() {
   const [podaci, setPodaci] = useState(() => {
     const saved = localStorage.getItem('rasporedPodaci');
     return saved ? JSON.parse(saved) : POCETNI_PODACI;
   });
 
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [datumPrikaz, setDatumPrikaz] = useState(getWeekDates(0));
+
   useEffect(() => {
     localStorage.setItem('rasporedPodaci', JSON.stringify(podaci));
   }, [podaci]);
+
+  const promeniSedmicu = (smer) => {
+    const newOffset = weekOffset + smer;
+    setWeekOffset(newOffset);
+    setDatumPrikaz(getWeekDates(newOffset));
+  };
 
   const generisiRaspored = (radnici) => {
     return radnici.map(radnik => {
@@ -81,41 +107,53 @@ export default function RasporedApp() {
 
   const azurirajDan = (sektor, index, dan, vrijednost) => {
     const noviPodaci = { ...podaci };
-    const radnik = noviPodaci[sektor][index];
+    noviPodaci[sektor] = [...noviPodaci[sektor]];
+    const radnik = { ...noviPodaci[sektor][index] };
+    
     if (vrijednost === "OFF") {
       radnik.slobodniDan = DANI.indexOf(dan);
     } else {
       radnik.smjena = vrijednost;
     }
+    
+    noviPodaci[sektor][index] = radnik;
     setPodaci(noviPodaci);
   };
 
   const azurirajIme = (sektor, index, ime) => {
     const noviPodaci = { ...podaci };
-    noviPodaci[sektor][index].ime = ime;
+    noviPodaci[sektor] = [...noviPodaci[sektor]];
+    noviPodaci[sektor][index] = { ...noviPodaci[sektor][index], ime };
     setPodaci(noviPodaci);
   };
 
   const azurirajPauzu = (sektor, index, pauza) => {
     const noviPodaci = { ...podaci };
-    noviPodaci[sektor][index].pauza = pauza;
+    noviPodaci[sektor] = [...noviPodaci[sektor]];
+    noviPodaci[sektor][index] = { ...noviPodaci[sektor][index], pauza };
     setPodaci(noviPodaci);
   };
 
   const azurirajSmjenu = (sektor, index, smjena) => {
     const noviPodaci = { ...podaci };
-    noviPodaci[sektor][index].smjena = smjena;
+    noviPodaci[sektor] = [...noviPodaci[sektor]];
+    const radnik = { ...noviPodaci[sektor][index], smjena };
+    
     if (smjena === "I") {
-      noviPodaci[sektor][index].pauza = PAUZE_PRVA[index % PAUZE_PRVA.length];
+      radnik.pauza = PAUZE_PRVA[index % PAUZE_PRVA.length];
     } else {
-      noviPodaci[sektor][index].pauza = PAUZE_DRUGA[index % PAUZE_DRUGA.length];
+      radnik.pauza = PAUZE_DRUGA[index % PAUZE_DRUGA.length];
     }
+    
+    noviPodaci[sektor][index] = radnik;
     setPodaci(noviPodaci);
   };
 
   const dodajRadnika = (sektor) => {
     const noviPodaci = { ...podaci };
+    noviPodaci[sektor] = [...noviPodaci[sektor]];
     const radniciUSektoru = noviPodaci[sektor];
+    
     const prvaSmena = radniciUSektoru.filter(r => r.smjena === "I").length;
     const drugaSmena = radniciUSektoru.filter(r => r.smjena === "II").length;
     const smjena = prvaSmena <= drugaSmena ? "I" : "II";
@@ -130,19 +168,20 @@ export default function RasporedApp() {
     brojSlobodnihPoDanima.sort((a, b) => a.broj - b.broj);
     const slobodniDan = brojSlobodnihPoDanima[0].dan;
     
-    radniciUSektoru.push({
+    noviPodaci[sektor].push({
       ime: "",
       smjena: smjena,
       pauza: pauza,
       slobodniDan: slobodniDan
     });
+    
     setPodaci(noviPodaci);
   };
 
   const obrisiRadnika = (sektor, index) => {
     if (window.confirm("Sigurno želiš da obrišeš ovog radnika?")) {
       const noviPodaci = { ...podaci };
-      noviPodaci[sektor].splice(index, 1);
+      noviPodaci[sektor] = noviPodaci[sektor].filter((_, i) => i !== index);
       setPodaci(noviPodaci);
     }
   };
@@ -150,11 +189,10 @@ export default function RasporedApp() {
   const autoRasporedi = () => {
     const noviPodaci = { ...podaci };
     Object.keys(noviPodaci).forEach(sektor => {
-      noviPodaci[sektor].forEach((radnik, index) => {
-        radnik.slobodniDan = index % 7;
-        const trenutniOffset = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000)) % 7;
-        radnik.slobodniDan = (radnik.slobodniDan + trenutniOffset) % 7;
-      });
+      noviPodaci[sektor] = noviPodaci[sektor].map((radnik, index) => ({
+        ...radnik,
+        slobodniDan: (index + weekOffset + 100) % 7
+      }));
     });
     setPodaci(noviPodaci);
   };
@@ -163,81 +201,98 @@ export default function RasporedApp() {
     if (window.confirm("Sigurno želiš da resetuješ SVE podatke na početne?")) {
       localStorage.removeItem('rasporedPodaci');
       setPodaci(POCETNI_PODACI);
+      setWeekOffset(0);
+      setDatumPrikaz(getWeekDates(0));
     }
   };
 
-  // Komponenta za prikaz tabele jednog sektora
+  // Komponenta za tabelu - KORISTIMO useRef za inpute
   const TabelaSektora = ({ sektor, podaciSektora, naslov }) => {
     const radnici = generisiRaspored(podaciSektora);
+    const inputRefs = useRef({});
     
     return (
-      <div className="mb-6 print:mb-3 print:break-inside-avoid">
-        <h2 className="text-lg font-bold mb-2 border-b-2 border-black pb-1 print:text-base">
+      <div className="mb-4 print:mb-1">
+        <h2 className="text-base font-bold mb-1 border-b-2 border-orange-800 pb-1 print:text-xs print:mb-0.5" 
+            style={{color: '#8B4513'}}>
           {naslov}
         </h2>
-        <table className="w-full border-collapse text-xs print:text-[9px]">
+        <table className="w-full border-collapse text-xs print:text-[8px]">
           <thead>
             <tr>
-              <th className="border border-gray-400 bg-gray-200 p-1 print:p-0.5 text-left min-w-[100px] print:min-w-[70px]">
+              <th className="border-2 border-orange-800 bg-orange-100 p-1.5 print:p-0.5 text-left min-w-[110px] print:min-w-[60px] font-bold"
+                  style={{backgroundColor: '#F5DEB3', color: '#8B4513'}}>
                 IME
               </th>
-              <th className="border border-gray-400 bg-gray-200 p-1 print:p-0.5 text-center min-w-[45px] print:min-w-[35px]">
+              <th className="border-2 border-orange-800 bg-orange-100 p-1.5 print:p-0.5 text-center min-w-[40px] print:min-w-[30px] font-bold"
+                  style={{backgroundColor: '#F5DEB3', color: '#8B4513'}}>
                 SM
               </th>
               {DANI.map(dan => (
-                <th key={dan} className="border border-gray-400 bg-gray-200 p-1 print:p-0.5 text-center min-w-[55px] print:min-w-[45px] text-[10px] print:text-[7px]">
+                <th key={dan} 
+                    className="border-2 border-orange-800 bg-orange-100 p-1.5 print:p-0.5 text-center min-w-[60px] print:min-w-[40px] font-bold text-[10px] print:text-[7px]"
+                    style={{backgroundColor: '#F5DEB3', color: '#8B4513'}}>
                   {dan.substring(0, 3)}
                 </th>
               ))}
-              <th className="border border-gray-400 bg-yellow-300 p-1 print:p-0.5 text-center min-w-[90px] print:min-w-[70px] text-[10px] print:text-[7px]">
-                PAUZA
+              <th className="border-2 border-orange-800 bg-yellow-200 p-1.5 print:p-0.5 text-center min-w-[100px] print:min-w-[65px] font-bold text-[10px] print:text-[7px]"
+                  style={{backgroundColor: '#FFD700', color: '#8B4513'}}>
+                30 MIN PAUZA
               </th>
             </tr>
           </thead>
           <tbody>
             {radnici.map((radnik, index) => (
-              <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                <td className="border border-gray-300 p-1 print:p-0.5">
+              <tr key={index}>
+                <td className="border-2 border-orange-800 p-1 print:p-0.5 bg-white">
                   <input
+                    ref={el => inputRefs.current[`${sektor}-${index}`] = el}
                     value={radnik.ime}
                     onChange={(e) => azurirajIme(sektor, index, e.target.value)}
-                    className="w-full p-0.5 outline-none bg-transparent text-xs print:text-[8px] font-medium"
-                    placeholder="Ime..."
+                    onClick={(e) => e.target.select()}
+                    className="w-full p-1 print:p-0.5 outline-none bg-transparent text-xs print:text-[7px] font-medium border-none"
+                    placeholder="..."
+                    style={{minHeight: '20px'}}
                   />
                 </td>
-                <td className="border border-gray-300 p-0.5 text-center">
+                <td className="border-2 border-orange-800 p-0.5 text-center bg-white">
                   <select
                     value={radnik.smjena}
                     onChange={(e) => azurirajSmjenu(sektor, index, e.target.value)}
-                    className={`w-full p-0.5 text-center text-xs font-bold rounded print:text-[8px] ${
-                      radnik.smjena === 'I' ? 'bg-blue-100' : 'bg-green-100'
-                    }`}
+                    className="w-full p-1 print:p-0 text-center text-xs font-bold border-none outline-none bg-transparent print:text-[7px]"
+                    style={{backgroundColor: radnik.smjena === 'I' ? '#E3F2FD' : '#E8F5E9'}}
                   >
                     <option value="I">I</option>
                     <option value="II">II</option>
                   </select>
                 </td>
-                {DANI.map(dan => (
-                  <td key={dan} className="border border-gray-300 p-0.5 text-center">
-                    <select
-                      value={radnik.raspored[dan]}
-                      onChange={(e) => azurirajDan(sektor, index, dan, e.target.value)}
-                      className={`w-full p-0.5 text-center text-xs font-bold rounded print:text-[8px] ${
-                        radnik.raspored[dan] === 'OFF' ? 'bg-red-100' :
-                        radnik.raspored[dan] === 'I' ? 'bg-blue-100' : 'bg-green-100'
-                      }`}
-                    >
-                      {SMJENE.map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </td>
-                ))}
-                <td className="border border-gray-300 p-0.5 bg-yellow-50">
+                {DANI.map(dan => {
+                  const vrijednost = radnik.raspored[dan];
+                  let bgColor = '#FFFFFF';
+                  if (vrijednost === 'OFF') bgColor = '#FFE0E0';
+                  else if (vrijednost === 'I') bgColor = '#E3F2FD';
+                  else if (vrijednost === 'II') bgColor = '#E8F5E9';
+                  
+                  return (
+                    <td key={dan} className="border-2 border-orange-800 p-0.5 text-center" 
+                        style={{backgroundColor: bgColor}}>
+                      <select
+                        value={vrijednost}
+                        onChange={(e) => azurirajDan(sektor, index, dan, e.target.value)}
+                        className="w-full p-1 print:p-0 text-center text-xs font-bold border-none outline-none bg-transparent print:text-[7px]"
+                      >
+                        {SMJENE.map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </td>
+                  );
+                })}
+                <td className="border-2 border-orange-800 p-0.5 bg-yellow-50">
                   <select
                     value={radnik.pauza}
                     onChange={(e) => azurirajPauzu(sektor, index, e.target.value)}
-                    className="w-full p-0.5 bg-yellow-50 text-xs print:text-[8px]"
+                    className="w-full p-1 print:p-0 bg-transparent text-xs print:text-[7px] border-none outline-none"
                   >
                     {(radnik.smjena === "I" ? PAUZE_PRVA : PAUZE_DRUGA).map(p => (
                       <option key={p} value={p}>{p}</option>
@@ -254,71 +309,112 @@ export default function RasporedApp() {
 
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white">
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 6mm;
+          }
+          body {
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+          table {
+            width: 100% !important;
+            page-break-inside: avoid;
+          }
+          input, select {
+            border: none !important;
+            background: transparent !important;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            font-size: 7px !important;
+          }
+          .border-2 {
+            border-width: 2px !important;
+          }
+        }
+      `}</style>
+
       {/* Header - ne štampa se */}
       <div className="bg-white shadow-lg mb-4 no-print">
         <div className="max-w-full mx-auto p-4">
-          <div className="flex flex-wrap justify-between items-center gap-3">
+          <div className="flex flex-wrap justify-between items-center gap-3 mb-3">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold">📋 RASPORED SMJENA</h1>
               <p className="text-sm text-gray-500">I smjena: 08:00-16:00 | II smjena: 16:00-00:00</p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => dodajRadnika('KONOBARI')} className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700">
-                + Konobar
-              </button>
-              <button onClick={() => dodajRadnika('KUHINJA')} className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700">
-                + Kuvar
-              </button>
-              <button onClick={() => dodajRadnika('ŠANK')} className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700">
-                + Šanker
-              </button>
-              <button onClick={autoRasporedi} className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700">
-                🔄 Auto
-              </button>
-              <button onClick={resetujPodatke} className="bg-gray-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-gray-700">
-                🔃 Reset
-              </button>
-              <button onClick={() => window.print()} className="bg-black text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-800 font-bold">
-                🖨️ Štampaj
-              </button>
+          </div>
+          
+          {/* Datum navigacija */}
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <button 
+              onClick={() => promeniSedmicu(-1)}
+              className="bg-gray-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-gray-700"
+            >
+              ◀ Prethodna
+            </button>
+            <div className="bg-white border-2 border-gray-300 px-4 py-2 rounded-lg font-bold text-sm min-w-[200px] text-center">
+              📅 {datumPrikaz}
             </div>
+            <button 
+              onClick={() => promeniSedmicu(1)}
+              className="bg-gray-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-gray-700"
+            >
+              Sledeća ▶
+            </button>
+            <span className="text-xs text-gray-500 ml-2">
+              (možeš kliknuti i direktno unositi datume)
+            </span>
+          </div>
+
+          {/* Dugmad */}
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => dodajRadnika('KONOBARI')} className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700">
+              + Konobar
+            </button>
+            <button onClick={() => dodajRadnika('KUHINJA')} className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700">
+              + Kuvar
+            </button>
+            <button onClick={() => dodajRadnika('ŠANK')} className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700">
+              + Šanker
+            </button>
+            <button onClick={autoRasporedi} className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700">
+              🔄 Auto Raspored
+            </button>
+            <button onClick={resetujPodatke} className="bg-gray-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-gray-700">
+              🔃 Reset
+            </button>
+            <button onClick={() => window.print()} className="bg-orange-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-900 font-bold">
+              🖨️ Štampaj A4
+            </button>
           </div>
         </div>
       </div>
 
       {/* Sadržaj za štampu - SVA 3 SEKTORA */}
-      <div className="max-w-full mx-auto p-4 print:p-2">
-        <div className="bg-white rounded-lg shadow print:shadow-none p-4 print:p-0">
+      <div className="max-w-full mx-auto p-4 print:p-0">
+        <div className="bg-white rounded-lg shadow print:shadow-none p-4 print:p-1">
           
-          {/* Naslov - samo u štampi */}
-          <div className="hidden print:block text-center mb-3 border-b-2 border-black pb-2">
-            <h1 className="text-xl font-bold">RASPORED SMJENA</h1>
-            <p className="text-sm">I smjena: 08:00-16:00 | II smjena: 16:00-00:00</p>
-            <p className="text-xs text-gray-600">Sedmica: 29.12.2026 - 04.01.2027</p>
+          {/* Naslov u štampi */}
+          <div className="hidden print:block text-center mb-2 border-b-2 border-orange-800 pb-1">
+            <h1 className="text-base font-bold" style={{color: '#8B4513'}}>RASPORED SMJENA</h1>
+            <p className="text-xs">I smjena: 08:00-16:00 | II smjena: 16:00-00:00</p>
+            <p className="text-xs font-bold">{datumPrikaz}</p>
           </div>
 
           {/* Sva 3 sektora */}
-          <TabelaSektora 
-            sektor="KONOBARI" 
-            podaciSektora={podaci.KONOBARI} 
-            naslov="KONOBARI" 
-          />
-          
-          <TabelaSektora 
-            sektor="KUHINJA" 
-            podaciSektora={podaci.KUHINJA} 
-            naslov="KUHINJA" 
-          />
-          
-          <TabelaSektora 
-            sektor="ŠANK" 
-            podaciSektora={podaci.ŠANK} 
-            naslov="ŠANK" 
-          />
+          <TabelaSektora sektor="KONOBARI" podaciSektora={podaci.KONOBARI} naslov="KONOBARI" />
+          <TabelaSektora sektor="KUHINJA" podaciSektora={podaci.KUHINJA} naslov="KUHINJA" />
+          <TabelaSektora sektor="ŠANK" podaciSektora={podaci.ŠANK} naslov="ŠANK" />
 
-          {/* Legenda - samo u štampi */}
-          <div className="hidden print:block mt-3 pt-2 border-t border-gray-300 text-xs">
-            <p><strong>I</strong> = Prva smjena (08:00-16:00) | <strong>II</strong> = Druga smjena (16:00-00:00) | <strong>OFF</strong> = Slobodan dan</p>
+          {/* Legenda u štampi */}
+          <div className="hidden print:block mt-2 pt-1 border-t-2 border-orange-800 text-[7px]">
+            <strong>I</strong> = Prva smjena (08:00-16:00) | <strong>II</strong> = Druga smjena (16:00-00:00) | <strong>OFF</strong> = Slobodan dan
           </div>
         </div>
       </div>
@@ -328,51 +424,15 @@ export default function RasporedApp() {
         <div className="bg-white rounded-lg shadow p-4">
           <h3 className="font-bold mb-2">📌 Legenda:</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-            <div><span className="inline-block w-4 h-4 bg-blue-100 border mr-2"></span>
+            <div><span className="inline-block w-4 h-4 bg-blue-100 border-2 border-orange-800 mr-2"></span>
               <strong>I</strong> = Prva smjena (08:00-16:00)</div>
-            <div><span className="inline-block w-4 h-4 bg-green-100 border mr-2"></span>
+            <div><span className="inline-block w-4 h-4 bg-green-100 border-2 border-orange-800 mr-2"></span>
               <strong>II</strong> = Druga smjena (16:00-00:00)</div>
-            <div><span className="inline-block w-4 h-4 bg-red-100 border mr-2"></span>
+            <div><span className="inline-block w-4 h-4 bg-red-100 border-2 border-orange-800 mr-2"></span>
               <strong>OFF</strong> = Slobodan dan</div>
           </div>
-          <p className="mt-2 text-xs text-gray-500">
-            💡 Klikni <strong>Štampaj</strong> za štampu svih sektora na A4 uspravno | Podaci se čuvaju automatski
-          </p>
         </div>
       </div>
-
-      {/* CSS za štampu */}
-      <style>{`
-        @media print {
-          @page {
-            size: A4 portrait;
-            margin: 8mm;
-          }
-          body {
-            background: white !important;
-            font-size: 9px;
-          }
-          .no-print {
-            display: none !important;
-          }
-          table {
-            font-size: 8px;
-          }
-          input, select {
-            border: none !important;
-            background: transparent !important;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            font-size: 8px;
-          }
-          select {
-            padding: 0 !important;
-          }
-          .print\\:break-inside-avoid {
-            break-inside: avoid;
-          }
-        }
-      `}</style>
     </div>
   );
 }
