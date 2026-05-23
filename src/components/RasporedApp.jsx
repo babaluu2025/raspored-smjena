@@ -379,27 +379,86 @@ export default function RasporedApp() {
   // =========== RENDER ===========
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white">
-      {/* ⬇️ SAMO OVO JE PROMENJENO - CSS ZA ŠTAMPU ⬇️ */}
+           {/* ⬇️ CSS ZA ŠTAMPU - ČITLJIVO, STANE NA A4 ⬇️ */}
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 3mm; }
+          @page { size: A4 portrait; margin: 4mm; }
           body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
           .no-print { display: none !important; }
-          table { width: 100% !important; border-collapse: collapse !important; font-size: 6px !important; }
-          th, td { border: 1px solid black !important; padding: 0.5px 1px !important; }
-          th { font-size: 6px !important; font-weight: bold !important; background-color: #E5E5E5 !important; }
-          input, select { border: none !important; background: transparent !important; -webkit-appearance: none; -moz-appearance: none; font-size: 6px !important; font-weight: bold !important; color: black !important; padding: 0 !important; }
-          h2 { font-size: 8px !important; font-weight: bold !important; border-bottom: 1px solid black !important; margin: 1px 0 !important; }
-          .mb-3, .mb-4 { margin-bottom: 1px !important; }
-          .p-2, .p-3, .p-4 { padding: 0 !important; }
-          .print\\:p-0\\.5 { padding: 0.5px !important; }
-          .print\\:p-0 { padding: 0 !important; }
-          .print\\:text-\\[6px\\] { font-size: 6px !important; }
-          .print\\:text-\\[10px\\] { font-size: 8px !important; }
-          .print\\:mb-1 { margin-bottom: 1px !important; }
+          
+          /* Sve tabele */
+          table { 
+            width: 100% !important; 
+            border-collapse: collapse !important; 
+            font-size: 8px !important; 
+          }
+          
+          /* Ćelije */
+          th, td { 
+            border: 1px solid black !important; 
+            padding: 2px 3px !important; 
+          }
+          
+          /* Header ćelije */
+          th { 
+            font-size: 8px !important; 
+            font-weight: bold !important; 
+            background-color: #E5E5E5 !important; 
+          }
+          
+          /* Inputi i selectovi */
+          input, select { 
+            border: none !important; 
+            background: transparent !important; 
+            -webkit-appearance: none; 
+            -moz-appearance: none; 
+            font-size: 8px !important; 
+            font-weight: bold !important; 
+            color: black !important; 
+            padding: 0 !important;
+            min-height: 14px !important;
+          }
+          
+          /* Naslovi sektora */
+          h2 { 
+            font-size: 10px !important; 
+            font-weight: bold !important; 
+            border-bottom: 1px solid black !important; 
+            margin: 2px 0 !important; 
+            padding: 1px 0 !important;
+          }
+          
+          /* Glavni naslov */
+          .print-title { 
+            font-size: 14px !important; 
+            font-weight: bold !important; 
+          }
+          
+          .print-date { 
+            font-size: 10px !important; 
+            font-weight: bold !important; 
+          }
+          
+          /* Smanji razmake */
+          .mb-3, .mb-4, .mb-6, .mb-10 { 
+            margin-bottom: 3px !important; 
+          }
+          
+          /* Smanji padding */
+          .p-2, .p-3, .p-4, .p-6 { 
+            padding: 1px !important; 
+          }
+          
+          /* Legenda */
+          .print-legend {
+            font-size: 7px !important;
+            font-weight: bold !important;
+            margin-top: 2px !important;
+            padding-top: 1px !important;
+          }
         }
       `}</style>
-      {/* ⬆️ KRAJ IZMENE ⬆️ */}
+      {/* ⬆️ KRAJ CSS-A ⬆️ */}
 
       <div className="bg-white shadow-lg mb-4 no-print">
         <div className="max-w-full mx-auto p-3 sm:p-4">
