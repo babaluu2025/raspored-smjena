@@ -1,0 +1,10 @@
+{
+  "name": "Raspored Smjena",
+  "short_name": "📋 Raspored",
+  "description": "Raspored smjena za ugostiteljstvo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a1a2e",
+  "icons": []
+}
