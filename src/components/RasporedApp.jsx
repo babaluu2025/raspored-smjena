@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 
+// ------------------------------------------------------------
+//  KONSTANTE
+// ------------------------------------------------------------
 const DANI = [
   "Ponedeljak", "Utorak", "Srijeda", "Četvrtak",
   "Petak", "Subota", "Nedelja"
 ];
 
 const SMJENE = ["I", "II", "OFF"];
-const SEKTORI = ["KONOBARI", "KUHINJA", "ŠANK"];
 
 const PAUZE_PRVA = [
   "09:00-09:30", "09:30-10:00", "10:00-10:30",
@@ -57,6 +59,9 @@ const POCETNI_PODACI = {
   ]
 };
 
+// ------------------------------------------------------------
+//  POMOĆNE FUNKCIJE
+// ------------------------------------------------------------
 function getWeekDates(offset = 0) {
   const now = new Date();
   const day = now.getDay() || 7;
@@ -72,9 +77,10 @@ function getWeekDates(offset = 0) {
 const seedShuffle = (array, seed) => {
   const shuffled = [...array];
   let m = shuffled.length;
+  let s = seed;
   const pseudoRandom = () => {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    return seed / 0x7fffffff;
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    return s / 0x7fffffff;
   };
   while (m) {
     const i = Math.floor(pseudoRandom() * m--);
@@ -83,12 +89,42 @@ const seedShuffle = (array, seed) => {
   return shuffled;
 };
 
-const SektorTabela = ({ sektor, radnici, naslov, onAzurirajIme, onAzurirajSmjenu, onAzurirajDan, onAzurirajPauzu }) => {
+/**
+ * MAGIČNA FUNKCIJA - Pravi savršeno izbalansiranu listu slobodnih dana
+ * Garantuje da je razlika između dana max 1
+ */
+const napraviBalansiranuListu = (ukupnoRadnika, seed) => {
+  if (ukupnoRadnika === 0) return [];
+  
+  const osnovno = Math.floor(ukupnoRadnika / 7);
+  const ostatak = ukupnoRadnika % 7;
+  
+  // Pravimo idealan šablon
+  let lista = [];
+  for (let dan = 0; dan < 7; dan++) {
+    const broj = osnovno + (dan < ostatak ? 1 : 0);
+    for (let i = 0; i < broj; i++) {
+      lista.push(dan);
+    }
+  }
+  
+  // Rotiramo da ne bude uvek isti dani sa viškom
+  const rotacija = seed % 7;
+  lista = lista.map(d => (d + rotacija) % 7);
+  
+  // Mešamo
+  return seedShuffle(lista, seed * 31 + 17);
+};
+
+// ------------------------------------------------------------
+//  KOMPONENTA ZA TABELU
+// ------------------------------------------------------------
+const SektorTabela = ({ sektor, radnici, naslov, onAzurirajIme, onAzurirajSmjenu, onAzurirajDan, onAzurirajPauzu, onObrisi }) => {
   return (
     <div className="mb-3 print:mb-2">
       <h2 className="text-sm font-bold mb-1 pb-1 text-center uppercase tracking-wider"
           style={{ borderBottom: '2px solid black', fontSize: '14px', fontWeight: 'bold' }}>
-        {naslov}
+        {naslov} ({radnici.length})
       </h2>
       <div className="overflow-x-auto -mx-1 px-1">
         <table className="w-full border-collapse text-xs">
@@ -104,6 +140,8 @@ const SektorTabela = ({ sektor, radnici, naslov, onAzurirajIme, onAzurirajSmjenu
               ))}
               <th className="border border-black bg-yellow-200 p-1.5 text-center font-bold"
                   style={{ fontSize: '10px', minWidth: '100px' }}>30 MIN PAUZA</th>
+              <th className="border border-black bg-gray-200 p-1.5 text-center font-bold no-print"
+                  style={{ fontSize: '10px', width: '30px' }}>✕</th>
             </tr>
           </thead>
           <tbody>
@@ -165,6 +203,9 @@ const SektorTabela = ({ sektor, radnici, naslov, onAzurirajIme, onAzurirajSmjenu
                     ))}
                   </select>
                 </td>
+                <td className="border border-black p-1 text-center no-print">
+                  <button onClick={() => onObrisi(sektor, index)} className="text-red-500 hover:text-red-700 font-bold">✕</button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -174,6 +215,9 @@ const SektorTabela = ({ sektor, radnici, naslov, onAzurirajIme, onAzurirajSmjenu
   );
 };
 
+// ------------------------------------------------------------
+//  GLAVNA APLIKACIJA
+// ------------------------------------------------------------
 export default function RasporedApp() {
   const [podaci, setPodaci] = useState(() => {
     const saved = localStorage.getItem('rasporedPodaci');
@@ -203,6 +247,8 @@ export default function RasporedApp() {
     });
   }, []);
 
+  // =========== HANDLERI ===========
+  
   const azurirajIme = useCallback((sektor, index, ime) => {
     setPodaci(prev => {
       const novi = { ...prev };
@@ -249,20 +295,54 @@ export default function RasporedApp() {
     });
   }, []);
 
+  // =========== DODAVANJE RADNIKA SA PAMETNOM LOGIKOM ===========
   const dodajRadnika = (sektor) => {
     setPodaci(prev => {
       const novi = { ...prev };
       novi[sektor] = [...novi[sektor]];
       const radnici = novi[sektor];
+      const ukupno = radnici.length + 1; // +1 jer dodajemo novog
+      
+      // 1. Balansiramo smene - dodajemo tamo gde ima manje
       const prva = radnici.filter(r => r.smjena === "I").length;
       const druga = radnici.filter(r => r.smjena === "II").length;
       const smjena = prva <= druga ? "I" : "II";
+      
+      // 2. Dodeljujemo pauzu
       const pauza = smjena === "I"
         ? PAUZE_PRVA[prva % PAUZE_PRVA.length]
         : PAUZE_DRUGA[druga % PAUZE_DRUGA.length];
-      const brojPoDanu = DANI.map((_, i) => radnici.filter(r => r.slobodniDan === i).length);
-      const minDan = brojPoDanu.indexOf(Math.min(...brojPoDanu));
-      radnici.push({ ime: "", smjena, pauza, slobodniDan: minDan });
+      
+      // 3. PRONALAZIMO NAJBOLJI SLOBODAN DAN
+      //    Koristimo istu logiku kao auto raspored - balansiramo!
+      const brojPoDanu = new Array(7).fill(0);
+      radnici.forEach(r => brojPoDanu[r.slobodniDan]++);
+      
+      // Idealno bi bilo da svaki dan ima isti broj
+      const idealno = Math.floor(ukupno / 7);
+      const ostatak = ukupno % 7;
+      
+      // Tražimo dan koji najviše odstupa od idealnog (ima premalo slobodnih)
+      let najboljiDan = 0;
+      let najmanjiBroj = Infinity;
+      
+      for (let dan = 0; dan < 7; dan++) {
+        const idealnoZaOvajDan = idealno + (dan < ostatak ? 1 : 0);
+        const trenutno = brojPoDanu[dan];
+        
+        // Ako ovaj dan ima manje od idealnog - to je kandidat
+        if (trenutno < idealnoZaOvajDan && trenutno < najmanjiBroj) {
+          najmanjiBroj = trenutno;
+          najboljiDan = dan;
+        }
+      }
+      
+      // Ako nismo našli (svi dani već imaju idealno), uzimamo dan sa najmanje
+      if (najmanjiBroj === Infinity) {
+        najboljiDan = brojPoDanu.indexOf(Math.min(...brojPoDanu));
+      }
+      
+      radnici.push({ ime: "", smjena, pauza, slobodniDan: najboljiDan });
       return novi;
     });
   };
@@ -277,100 +357,45 @@ export default function RasporedApp() {
     }
   };
 
+  // =========== AUTO RASPORED - SAVRŠEN BALANS ===========
   const autoRasporedi = () => {
-  setPodaci(prev => {
-    const novi = { ...prev };
-    
-    Object.keys(novi).forEach((sektor) => {
-      const radnici = [...novi[sektor]];
-      const ukupno = radnici.length;
+    setPodaci(prev => {
+      const novi = { ...prev };
       
-      if (ukupno === 0) return;
-      
-      // ======================================================
-      //  KORAK 1: Pravimo šablon za CEO SEKTOR
-      //  Cilj: Svih 7 dana mora biti pokriveno što ravnomernije
-      // ======================================================
-      
-      // Računamo koliko radnika po danu (idealno)
-      const idealnoPoDanu = ukupno / 7;
-      
-      // Pravimo niz dana za sve radnike
-      let sviDani = [];
-      
-      // Prvo dodeljujemo svaki dan bar 1 (ako ima 7+ radnika)
-      if (ukupno >= 7) {
-        // Svaki dan dobija bar 1 slobodnog
-        for (let dan = 0; dan < 7; dan++) {
-          sviDani.push(dan);
-        }
+      Object.keys(novi).forEach((sektor, sektorIndex) => {
+        const radnici = [...novi[sektor]];
+        const ukupno = radnici.length;
         
-        // Ostatak ravnomerno raspoređujemo
-        const ostatak = ukupno - 7;
-        for (let i = 0; i < ostatak; i++) {
-          // Dodajemo dan koji trenutno ima najmanje slobodnih
-          const brojPoDanu = new Array(7).fill(0);
-          sviDani.forEach(d => brojPoDanu[d]++);
-          const minBroj = Math.min(...brojPoDanu);
-          const danSaNajmanje = brojPoDanu.indexOf(minBroj);
-          sviDani.push(danSaNajmanje);
-        }
-      } else {
-        // Manje od 7 radnika - biramo dane sa ravnomernim razmakom
-        // npr. 6 radnika = dani 0,1,2,3,4,5 (nedelja prazna)
-        //      5 radnika = dani 0,1,2,4,5 (sreda i subota prazne)
-        //      3 radnika = dani 0,2,4 (razmak 2)
+        if (ukupno === 0) return;
         
-        const korak = 7 / ukupno;
-        for (let i = 0; i < ukupno; i++) {
-          const dan = Math.floor(i * korak);
-          sviDani.push(dan % 7);
-        }
+        // Kreiramo savršeno balansiranu listu dana
+        const seed = weekOffset * 100 + sektorIndex * 13 + Math.floor(Date.now() / 86400000);
+        const listaDana = napraviBalansiranuListu(ukupno, seed);
         
-        // Rotiramo za random offset da ne bude uvek isto
-        const offset = Math.floor(Math.random() * 7);
-        sviDani = sviDani.map(d => (d + offset) % 7);
-      }
-      
-      // Mešamo dane
-      sviDani = seedShuffle(sviDani, Math.floor(Math.random() * 1000));
-      
-      // ======================================================
-      //  KORAK 2: Dodeljujemo dane radnicima
-      //  Prvo I smena, pa II smena
-      // ======================================================
-      
-      const prvaSmena = radnici.filter(r => r.smjena === "I");
-      const drugaSmena = radnici.filter(r => r.smjena === "II");
-      
-      let indexDana = 0;
-      
-      // Dodeljujemo I smeni
-      const prvaSaDanima = prvaSmena.map((radnik) => {
-        let dan = sviDani[indexDana];
-        if (radnik.slobodniDan === dan && ukupno > 1) {
-          dan = (dan + 1) % 7;
-        }
-        indexDana++;
-        return { ...radnik, slobodniDan: dan };
+        // Ispis za proveru
+        const brojPoDanu = new Array(7).fill(0);
+        listaDana.forEach(d => brojPoDanu[d]++);
+        console.log(`✅ ${sektor} (${ukupno}):`, DANI.map((d, i) => `${d.substring(0,3)}:${brojPoDanu[i]}`).join(' | '));
+        
+        // Dodeljujemo radnicima
+        const noviRadnici = radnici.map((radnik, index) => {
+          let dan = listaDana[index];
+          
+          // Ako je isti dan kao prošle nedelje - pomeri
+          if (radnik.slobodniDan === dan && ukupno > 1) {
+            dan = (dan + 1) % 7;
+          }
+          
+          return { ...radnik, slobodniDan: dan };
+        });
+        
+        novi[sektor] = noviRadnici;
       });
       
-      // Dodeljujemo II smeni
-      const drugaSaDanima = drugaSmena.map((radnik) => {
-        let dan = sviDani[indexDana];
-        if (radnik.slobodniDan === dan && ukupno > 1) {
-          dan = (dan + 1) % 7;
-        }
-        indexDana++;
-        return { ...radnik, slobodniDan: dan };
-      });
-      
-      novi[sektor] = [...prvaSaDanima, ...drugaSaDanima];
+      return novi;
     });
-    
-    return novi;
-  });
-};
+  };
+
   const resetujPodatke = () => {
     if (window.confirm("Resetovati SVE podatke na početne?")) {
       localStorage.removeItem('rasporedPodaci');
@@ -384,6 +409,7 @@ export default function RasporedApp() {
   const kuhinjaRaspored = generisiRaspored(podaci.KUHINJA);
   const sankRaspored = generisiRaspored(podaci.ŠANK);
 
+  // =========== RENDER ===========
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white">
       <style>{`
@@ -432,15 +458,15 @@ export default function RasporedApp() {
 
           <SektorTabela sektor="KONOBARI" radnici={konobariRaspored} naslov="KONOBARI"
             onAzurirajIme={azurirajIme} onAzurirajSmjenu={azurirajSmjenu}
-            onAzurirajDan={azurirajDan} onAzurirajPauzu={azurirajPauzu} />
+            onAzurirajDan={azurirajDan} onAzurirajPauzu={azurirajPauzu} onObrisi={obrisiRadnika} />
           
           <SektorTabela sektor="KUHINJA" radnici={kuhinjaRaspored} naslov="KUHINJA"
             onAzurirajIme={azurirajIme} onAzurirajSmjenu={azurirajSmjenu}
-            onAzurirajDan={azurirajDan} onAzurirajPauzu={azurirajPauzu} />
+            onAzurirajDan={azurirajDan} onAzurirajPauzu={azurirajPauzu} onObrisi={obrisiRadnika} />
           
           <SektorTabela sektor="ŠANK" radnici={sankRaspored} naslov="ŠANK"
             onAzurirajIme={azurirajIme} onAzurirajSmjenu={azurirajSmjenu}
-            onAzurirajDan={azurirajDan} onAzurirajPauzu={azurirajPauzu} />
+            onAzurirajDan={azurirajDan} onAzurirajPauzu={azurirajPauzu} onObrisi={obrisiRadnika} />
 
           <div className="hidden print:block mt-2 pt-1 border-t border-black text-xs font-bold">
             I = Prva smjena &nbsp;&nbsp;|&nbsp;&nbsp; II = Druga smjena &nbsp;&nbsp;|&nbsp;&nbsp; OFF = Slobodan dan
@@ -456,7 +482,6 @@ export default function RasporedApp() {
             <div><span className="inline-block w-4 h-4 mr-2" style={{backgroundColor: '#22C55E', border: '1px solid black'}}></span><strong>II</strong> = Druga smjena (16:00-00:00)</div>
             <div><span className="inline-block w-4 h-4 mr-2" style={{backgroundColor: '#EF4444', border: '1px solid black'}}></span><strong>OFF</strong> = Slobodan dan</div>
           </div>
-          <p className="mt-2 text-xs text-gray-500">💾 Podaci se automatski čuvaju | 📱 Možeš instalirati kao aplikaciju | 🔄 Auto Raspored - svi dani ravnomerno</p>
         </div>
       </div>
     </div>
